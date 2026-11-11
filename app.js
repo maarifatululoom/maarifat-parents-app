@@ -37,7 +37,7 @@ function reportCard(){
    '<div class="sec">Attendance \u2013 '+esc(ym)+'</div><table class="t4"><tr><th>Present</th><th>Absent</th><th>Leave</th><th>Attendance %</th></tr><tr><td>'+cnt('Present')+'</td><td>'+cnt('Absent')+'</td><td>'+cnt('Leave')+'</td><td>'+(tot?pct+'%':'-')+'</td></tr></table>'+
    '<div class="sec">Current lesson / Maujooda sabaq</div><div class="sum">'+(last?esc(last.lesson)+(last.notes?' \u2013 '+esc(last.notes):''):'-')+'</div>'+
    (recent.length?'<div class="sum"><small>Recent: '+recent.map(a=>esc(a.date)+': '+esc(a.lesson||a.notes)).join(' \u00b7 ')+'</small></div>':'')+
-   '<div class="sec">Progress summary / Taraqqi ka khulasa</div><div class="sum">'+(ai&&ai.summary?esc(ai.summary):'-')+'</div>'+
+   '<div class="sec">Progress summary / Taraqqi ka khulasa</div>'+(ai&&ai.summary?fmtSum(ai.summary,1):'<div class=sum>-</div>')+''+
    '<div class="sec">Exam results / Imtihan</div>'+exRows+
    '<div class="sec">Fee status / Fees</div><div class="sum">'+(fee?esc(ym)+': '+rs(fee.amount)+' \u2013 '+esc(fee.status)+(fee.paid_on?' ('+esc(fee.paid_on)+')':''):'-')+'</div>'+
    '<div class="sg"><div>Parent / Guardian</div><div>Teacher / Academy</div></div><div class="ft">Generated from the Parents App on '+esc(nowK().slice(0,10))+' \u00b7 '+esc(BRAND)+'</div></div>');
@@ -86,7 +86,7 @@ function render(){
   h+=`<div class="card"><div class="rowx"><b style="font-size:18px">${esc(s.name)}</b><span class="badge Paid">#${s.roll_no}</span></div><div class="mut">${t('level')}: ${esc(s.level||'-')} \u00b7 ${t('timing')}: ${esc(s.timing||'-')}</div></div>`;
   h+=`<button class="btn" data-print="report" style="margin-top:0;margin-bottom:12px">\ud83d\udda8\ufe0f ${t('rcard')}</button>`;
   const ai=s.ai_summary;
-  h+=`<h2>${t('progress')}</h2><div class="card">`+(ai&&ai.summary?`<div class="sum">${esc(ai.summary)}</div><div class="mut" style="margin-top:6px">${t('updated')}: ${esc(String(ai.generated_at||'').slice(0,10))}</div>`:`<div class="mut">${t('noSum')}</div>`)+'</div>';
+  h+=`<h2>${t('progress')}</h2><div class="card">`+(ai&&ai.summary?`${fmtSum(ai.summary)}<div class="mut" style="margin-top:6px">${t('updated')}: ${esc(String(ai.generated_at||'').slice(0,10))}</div>`:`<div class="mut">${t('noSum')}</div>`)+'</div>';
   h+=`<h2>${t('att')} \u2013 ${t('thisMonth')}</h2><div class="kpis"><div class="kpi"><div>${cnt('Present')}</div><small>${t('present')}</small></div><div class="kpi"><div>${cnt('Absent')}</div><small>${t('absent')}</small></div><div class="kpi"><div>${cnt('Leave')}</div><small>${t('leave')}</small></div></div>`;
   h+=`<div class="card"><b>${t('last')}</b>`+(att.length?att.slice(0,30).map(a=>`<div class="item"><div class="rowx"><span>${esc(a.date)}</span><span class="badge ${esc(a.status)}">${t(a.status)}</span></div>${a.lesson?`<div>${esc(a.lesson)}</div>`:''}${a.notes?`<div class="mut">${esc(a.notes)}</div>`:''}</div>`).join(''):`<div class="mut">${t('noAtt')}</div>`)+'</div>';
   const M={};
@@ -107,3 +107,23 @@ $('dash').onclick=e=>{
 setTheme(localStorage.getItem('pdark')==='1');
 apply();
 (async()=>{const w=localStorage.getItem('pw'),c=localStorage.getItem('pc');if(w&&c){$('wa').value=w;$('rm').checked=true;await login(w,c,true,true)}})();
+
+// ---------- Progress summary: one idea per paragraph, colour coded ----------
+(function(){const st=document.createElement('style');st.textContent='.sm{display:grid;gap:10px}.sm p{margin:0;padding:11px 14px;border-radius:14px;border-left:5px solid var(--c);background:color-mix(in srgb,var(--c) 13%,var(--card));line-height:1.7;font-size:14.5px;animation:up .45s both}.sm p.hi{background:none;border:0;padding:0 2px;font-weight:600;color:var(--gold)}.sm small{display:block;font-weight:600;color:var(--c);letter-spacing:.5px;font-size:11px;text-transform:uppercase;margin-bottom:2px}';document.head.appendChild(st)})();
+const SUMK=[
+ ['improve',/(mazeed|zaroorat|kamzor|tawajjuh|dhyan|mushkil|weak|improve|needs? |koshish karni)/i,'#d98a1f','\ud83d\udca1','Focus area'],
+ ['att',/(hazri|attendance|chhutti|chutti|ghair|absent|leave|present|naagha)/i,'#2f6fd0','\ud83d\udcc5','Attendance'],
+ ['good',/(mashallah|masha allah|behtareen|behtar|excellent|great|shabash|taraqqi|acha|achi|achha|accha|achhi|good|well)/i,'#1e8e5a','\u2b50','Doing well'],
+ ['lesson',/./,'#8a6a1f','\ud83d\udcd6','Lesson']];
+function fmtSum(txt,print){
+  const raw=String(txt||'').trim();if(!raw)return '';
+  let p=raw.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  if(p.length<2)p=(raw.match(/[^.!?\u06d4]+[.!?\u06d4]*/g)||[raw]).map(x=>x.trim()).filter(Boolean);
+  const gr=/^(assalam|salam|\u0627\u0644\u0633\u0644\u0627\u0645)/i,out=[];
+  p.forEach(s=>{if(out.length&&s.length<12&&!gr.test(s)&&!gr.test(out[out.length-1]))out[out.length-1]+=' '+s;else out.push(s)});
+  const html=out.map((s,i)=>{
+    if(i===0&&gr.test(s)&&s.length<70)return print?'<p style="margin:0 0 8px;font-weight:700;color:#8a6a1f">'+esc(s)+'</p>':'<p class="hi" style="--c:var(--gold)">'+esc(s)+'</p>';
+    const k=SUMK.find(x=>x[1].test(s))||SUMK[3];
+    return print?'<p style="margin:0 0 8px;padding:8px 12px;border-left:4px solid '+k[2]+';background:#f6f0e3;line-height:1.6">'+k[3]+' <b style="color:'+k[2]+'">'+k[4]+':</b> '+esc(s)+'</p>':'<p style="--c:'+k[2]+'"><small>'+k[3]+' '+k[4]+'</small>'+esc(s)+'</p>'}).join('');
+  return print?html:'<div class="sm">'+html+'</div>';
+}
